@@ -4,8 +4,7 @@
 	 ffi/unsafe/define)
 
 
-(define-ffi-definer define-raylib (ffi-lib
-				   "/usr/local/lib/libraylib.so"))
+(define-ffi-definer define-raylib (ffi-lib "/usr/local/lib/libraylib.so"))
 
 
 ;; raylib basic defines
@@ -94,7 +93,7 @@
 
 (define-raylib InitWindow (_fun _int _int _string -> _void))
 (define-raylib SetTargetFPS (_fun _int -> _void))
-(define-raylib WindowShouldClose (_fun -> _void))
+(define-raylib WindowShouldClose (_fun -> _bool))
 (define-raylib CloseWindow (_fun -> _void))
 
 ;; drawing functions
@@ -102,7 +101,7 @@
 (define-raylib BeginDrawing (_fun -> _void))
 (define-raylib ClearBackground (_fun _color -> _void))
 
-(define-raylib TextSubtext (_fun _string _int _int -> _string))
+;; (define-raylib TextSubtext (_fun _string _int _int -> _string))
 (define-raylib DrawText (_fun _string _int _int _int _color -> _void))
 
 (define-raylib EndDrawing (_fun -> _void))
@@ -111,6 +110,8 @@
 (define-raylib IsKeyPressed (_fun _int -> _bool))
 
 (define-raylib LoadModel (_fun _string -> _model))
+(define-raylib UnloadModel (_fun _model -> _void))
+
 (define-raylib LoadTexture (_fun _string -> _texture-2d))
 
 (define-raylib MeshBoundingBox (_fun _mesh -> _bounding-box))
@@ -119,14 +120,16 @@
 
 (define-raylib BeginMode3D (_fun _camera -> _void))
 (define-raylib EndMode3D (_fun -> _void))
-
+1
 (define-raylib DrawModel (_fun _model _vector3 _float _color -> _void))
 (define-raylib DrawGrid (_fun _float _float -> _void))
 
-(define-raylib UpdateCamera (_fun _camera-pointer -> _void))
+(define-raylib UpdateCamera (_fun (_ptr io _camera) -> _void))
 ;;;;;;;;;;;;;;;;;
 ;; Application ;;
 ;;;;;;;;;;;;;;;;;
+
+(InitWindow 1366 768 "load 3d model")
 
 (define pos (make-vector3 0.0 0.0 0.0))
 
@@ -136,33 +139,28 @@
     			 45.0
     			 0))
 
+(define m (LoadModel "int.obj")) 
 
-(define (draw model msg)
-  (when (IsKeyPressed 257) (CloseWindow))
-  (UpdateCamera cam)
-  (BeginDrawing)
-  (ClearBackground (make-color 245 245 245 255))
-  (BeginMode3D cam)
-  (DrawModel model pos 1.0 (make-color 0 0 0 255))
-  (DrawGrid 20.0 10.0)
-  (EndMode3D)
-  (EndDrawing)
-  (draw cam model msg))
+(SetCameraMode cam 'CAMERA_FREE)
 
+(SetTargetFPS 60)
 
-(define init
-  (lambda ()
-    (InitWindow 1366 768 "load 3d model")
-    (SetTargetFPS 60)
+(define (draw)
+  (if (WindowShouldClose)
+      (begin  (CloseWindow)
+	      (UnloadModel m) 
+	      (CloseWindow))
+      (begin  (UpdateCamera cam)
+	      (BeginDrawing)
+	      (ClearBackground (make-color 245 245 245 255))
+	      (BeginMode3D cam)
+	      (DrawModel m pos 1.0 (make-color 0 0 0 255))
+	      (DrawGrid 20.0 10.0)
+	      (EndMode3D)
+	      (EndDrawing)
+	      (draw))))
 
-
-    (define m (LoadModel "turret.obj"))
-    ;; (define t (LoadTexture "turret_diffuse.png"))
-    ;; (define bounds (MeshBoundingBox (model-mesh m)))
-    (SetCameraMode cam 'CAMERA_FREE)
-    (draw m "as")))
-
-(init)
+(draw)
 
 ;; (define worker (thread (draw 0 "abcdas")))
 
