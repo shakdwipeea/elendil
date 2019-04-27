@@ -1,10 +1,14 @@
 #lang racket
 
 (require ffi/unsafe
-	 ffi/unsafe/define)
+	 (except-in ffi/unsafe/define
+		    define-ffi-definer)
+	 ffi-definer-convention)
 
 
-(define-ffi-definer define-raylib (ffi-lib "/usr/local/lib/libraylib.so"))
+(define-ffi-definer define-raylib
+  (ffi-lib "/usr/local/lib/libraylib.so")
+  #:make-c-id convention:hyphen->camelcase)
 
 
 ;; raylib basic defines
@@ -24,13 +28,13 @@
 	   CAMERA_THIRD_PERSON)))
 
 ;; structs
-(define-cstruct _vector2 ([_x _float] [_y _float]))
-(define-cstruct _vector3 ([_x _float] [_y _float] [_z _float]))
+(define-cstruct _vector2 ([x _float] [y _float]))
+(define-cstruct _vector3 ([x _float] [y _float] [z _float]))
 (define-cstruct _vector4
-  ([_x _float]
-   [_y _float]
-   [_z _float]
-   [_w _float]))
+  ([x _float]
+   [y _float]
+   [z _float]
+   [w _float]))
 
 (define-cstruct _color
   ([r _byte]
@@ -91,45 +95,48 @@
    [max _vector3]))
 
 
-(define-raylib InitWindow (_fun _int _int _string -> _void))
-(define-raylib SetTargetFPS (_fun _int -> _void))
-(define-raylib WindowShouldClose (_fun -> _bool))
-(define-raylib CloseWindow (_fun -> _void))
+(define-raylib init-window (_fun _int _int _string -> _void))
+(define-raylib set-target-fps (_fun _int -> _void)
+  #:c-id SetTargetFPS)
+(define-raylib window-should-close (_fun -> _bool))
+(define-raylib close-window (_fun -> _void))
 
 ;; drawing functions
 
-(define-raylib BeginDrawing (_fun -> _void))
-(define-raylib ClearBackground (_fun _color -> _void))
+(define-raylib begin-drawing (_fun -> _void))
+(define-raylib clear-background (_fun _color -> _void))
 
 ;; (define-raylib TextSubtext (_fun _string _int _int -> _string))
-(define-raylib DrawText (_fun _string _int _int _int _color -> _void))
+(define-raylib draw-text (_fun _string _int _int _int _color -> _void))
 
-(define-raylib EndDrawing (_fun -> _void))
+(define-raylib end-drawing (_fun -> _void))
 
 ;; key functions
-(define-raylib IsKeyPressed (_fun _int -> _bool))
+(define-raylib is-key-pressed (_fun _int -> _bool))
 
-(define-raylib LoadModel (_fun _string -> _model))
-(define-raylib UnloadModel (_fun _model -> _void))
+(define-raylib load-model (_fun _string -> _model))
+(define-raylib unload-model (_fun _model -> _void))
 
-(define-raylib LoadTexture (_fun _string -> _texture-2d))
+(define-raylib load-texture (_fun _string -> _texture-2d))
 
-(define-raylib MeshBoundingBox (_fun _mesh -> _bounding-box))
+(define-raylib mesh-bounding-box (_fun _mesh -> _bounding-box))
 
-(define-raylib SetCameraMode (_fun _camera _camera-mode -> _void))
+(define-raylib set-camera-mode (_fun _camera _camera-mode -> _void))
 
-(define-raylib BeginMode3D (_fun _camera -> _void))
-(define-raylib EndMode3D (_fun -> _void))
+(define-raylib begin-mode-3d (_fun _camera -> _void))
+(define-raylib end-mode-3d (_fun -> _void))
 1
-(define-raylib DrawModel (_fun _model _vector3 _float _color -> _void))
-(define-raylib DrawGrid (_fun _float _float -> _void))
+(define-raylib draw-model (_fun _model _vector3 _float _color -> _void))
+(define-raylib draw-grid (_fun _int _float -> _void))
 
-(define-raylib UpdateCamera (_fun (_ptr io _camera) -> _void))
+(define-raylib update-camera (_fun (c : (_ptr io _camera))
+				   -> _void
+				   -> c))
 ;;;;;;;;;;;;;;;;;
 ;; Application ;;
 ;;;;;;;;;;;;;;;;;
 
-(InitWindow 1366 768 "load 3d model")
+(init-window 1366 768 "elendil")
 
 (define pos (make-vector3 0.0 0.0 0.0))
 
@@ -139,28 +146,29 @@
     			 45.0
     			 0))
 
-(define m (LoadModel "int.obj")) 
+(define m (load-model "int.obj")) 
 
-(SetCameraMode cam 'CAMERA_FREE)
+(set-camera-mode cam 'CAMERA_CUSTOM)
 
-(SetTargetFPS 60)
+(set-target-fps 120)
 
-(define (draw)
-  (if (WindowShouldClose)
-      (begin  (CloseWindow)
-	      (UnloadModel m) 
-	      (CloseWindow))
-      (begin  (UpdateCamera cam)
-	      (BeginDrawing)
-	      (ClearBackground (make-color 245 245 245 255))
-	      (BeginMode3D cam)
-	      (DrawModel m pos 1.0 (make-color 0 0 0 255))
-	      (DrawGrid 20.0 10.0)
-	      (EndMode3D)
-	      (EndDrawing)
-	      (draw))))
+(define (draw cam i)
+  (if (window-should-close)
+      (begin  (close-window)
+	      (unload-model m) 
+	      (close-window))
+      (begin  (begin-drawing)
+	      (clear-background (make-color 245 245 245 255))
+	      (begin-mode-3d cam)
+	      (draw-model m pos 1.0 (make-color 0 0 0 255))
+	      (draw-grid 20 10.0)
+	      (end-mode-3d)
+	      (end-drawing)
+	      (set-camera-position! cam (make-vector3 i 30.0 30.0))
+	      (draw (update-camera cam)
+		    (+ i 80.0)))))
 
-(draw)
+(draw cam 30.0)
 
 ;; (define worker (thread (draw 0 "abcdas")))
 
