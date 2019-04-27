@@ -3,7 +3,8 @@
 (require ffi/unsafe
 	 (except-in ffi/unsafe/define
 		    define-ffi-definer)
-	 ffi-definer-convention)
+	 ffi-definer-convention
+	 threading)
 
 
 (define-ffi-definer define-raylib
@@ -144,17 +145,17 @@
 
 
 (define (draw state)
-  (let* ([d        (hash-ref state 'draw-fn)]
-	 [destroy  (hash-ref state 'destroy-fn)]
-	 [bg-color (hash-ref state 'background-color)])
+  (let ([d        (hash-ref state 'draw-fn)]
+	[destroy  (hash-ref state 'destroy-fn)]
+	[bg-color (hash-ref state 'background-color)])
     (if (window-should-close)
 	(begin (destroy)
 	       (close-window))
 	(begin  (begin-drawing)
 		(clear-background bg-color)
-		(d state)
-		(end-drawing)
-		(draw state)))))
+		(let ([st (d state)])
+		  (end-drawing)
+		  (draw st))))))
 
 
 (define (with-window #:init-fn init
@@ -162,14 +163,15 @@
 		     #:height  [height 1366]
 		     #:width   [width 768]
 		     #:title   [title "raylib"]
-		     #:initial-state [state (make-hash)])
+		     #:initial-state [state (make-immutable-hash)])
   (init-window height width title)
-  (hash-set! state 'camera default-camera)
-  (hash-set! state 'draw-fn d)
-  (init state)
-  (set-camera-mode (hash-ref state 'camera) 'CAMERA_CUSTOM)
-  (set-target-fps 120)
-  (draw state))
+  (let ([st  (~> state
+		 (hash-set 'camera default-camera)
+		 (hash-set 'draw-fn d)
+		 init)])
+    (set-camera-mode (hash-ref st 'camera) 'CAMERA_CUSTOM)
+    (set-target-fps 120)
+    (draw st)))
 
 
 (provide (all-defined-out))
